@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent AI Chat App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: currentColor;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
+        
+        .chat-bubble {
+            max-width: 80%;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-area {
+            border: 2px dashed;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-area.drag-over {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        
+        .agent-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .message-content {
+            word-wrap: break-word;
+        }
+        
+        /* Scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <!-- App Container -->
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <!-- Header -->
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center space-x-3">
+                    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/e2fd53e1-884c-4ccd-97c8-4abaea516005.png" alt="Multi-Agent AI Chat App logo featuring interconnected nodes with blue and purple gradient design" class="w-12 h-12 rounded-lg">
+                    <div>
+                        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">AI Chat</h1>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Multi-Agent System</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent Selection -->
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">SELECT AGENT</h2>
+                <div class="space-y-2" id="agent-list">
+                    <!-- Agents will be populated here -->
+                </div>
+            </div>
+
+            <!-- Chat History -->
+            <div class="flex-1 overflow-hidden">
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">CHAT HISTORY</h2>
+                    <div class="space-y-2" id="chat-history">
+                        <div class="text-sm text-gray-500 dark:text-gray-400 text-center">No conversations yet</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                <button onclick="toggleTheme()" class="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-text">Dark Mode</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Chat Header -->
+            <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <img id="current-agent-avatar" src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/0b63052b-8efa-45fa-ab2c-6e1a4a27a421.png" alt="Professor AI avatar showing a wise owl with glasses and academic robe" class="agent-avatar">
+                        <div>
+                            <h2 id="current-agent-name" class="font-semibold text-gray-900 dark:text-white">Professor AI</h2>
+                            <p id="current-agent-desc" class="text-sm text-gray-500 dark:text-gray-400">Academic expertise and structured explanations</p>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="exportChat()" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                            📄
+                        </button>
+                        <button onclick="clearChat()" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                            🗑️
+                        </button>
+                        <button onclick="openSettings()" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                            ⚙️
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                <div class="text-center py-8">
+                    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/903e60ff-96fe-4499-8eb8-8b5f78941dbc.png" alt="Welcome illustration showing AI agents collaborating around a chat bubble with glowing connections" class="mx-auto mb-4 rounded-lg opacity-80">
+                    <h3 class="text-lg font-medium text-gray-600 dark:text-gray-400">Start a conversation with your AI agent</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-500">Choose from different AI personalities to get the perfect response style</p>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+                <!-- File Upload Area -->
+                <div id="file-upload-area" class="file-upload-area border-gray-300 dark:border-gray-600 rounded-lg p-3 mb-3 text-center cursor-pointer hidden">
+                    <div class="text-gray-500 dark:text-gray-400">
+                        <div class="mb-2">📁</div>
+                        <p class="text-sm">Drop files here or click to upload</p>
+                        <p class="text-xs opacity-70">Supports PDF, TXT, DOCX files</p>
+                    </div>
+                    <input type="file" id="file-input" class="hidden" accept=".pdf,.txt,.docx" multiple>
+                </div>
+
+                <!-- Input Container -->
+                <div class="flex space-x-2">
+                    <button onclick="toggleVoiceInput()" id="voice-btn" class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600">
+                        🎤
+                    </button>
+                    <div class="flex-1 relative">
+                        <textarea 
+                            id="message-input" 
+                            placeholder="Type your message..." 
+                            rows="1"
+                            class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            oninput="autoResize(this)"
+                        ></textarea>
+                        <button onclick="toggleFileUpload()" class="absolute right-2 bottom-2 p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                            📎
+                        </button>
+                    </div>
+                    <button onclick="sendMessage()" id="send-btn" class="p-3 bg-primary-600 hover:bg-primary-700 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Settings</h3>
+                <button onclick="closeSettings()" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                    ✕
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Temperature (Creativity)</label>
+                    <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7" class="w-full">
+                    <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>Precise</span>
+                        <span id="temperature-value">0.7</span>
+                        <span>Creative</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Response Length</label>
+                    <select id="max-tokens" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="100">Short</option>
+                        <option value="250" selected>Medium</option>
+                        <option value="500">Long</option>
+                        <option value="1000">Very Long</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Response Style</label>
+                    <select id="response-style" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="balanced">Balanced</option>
+                        <option value="formal">Formal</option>
+                        <option value="casual">Casual</option>
+                        <option value="humorous">Humorous</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeSettings()" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                    Cancel
+                </button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // App State
+        let currentAgent = 'professor';
+        let isDarkMode = false;
+        let messages = [];
+        let isRecording = false;
+        let recognition = null;
+        let currentSettings = {
+            temperature: 0.7,
+            maxTokens: 250,
+            responseStyle: 'balanced'
+        };
+
+        // AI Agents Configuration
+        const agents = {
+            professor: {
+                name: "Professor AI",
+                description: "Academic expertise and structured explanations",
+                avatar: "https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/4eda20d8-496d-4e64-a76d-2d8eef0d5f60.png",
+                avatarAlt: "Professor AI avatar showing a wise owl with glasses and academic robe",
+                prompt: "You are a university professor with expertise across multiple disciplines. Provide structured, well-reasoned responses with clear explanations, definitions, and relevant examples. Use academic language but remain accessible. Organize your thoughts logically and cite sources when appropriate."
+            },
+            friendly: {
+                name: "Friendly Buddy AI",
+                description: "Casual conversations and emotional support",
+                avatar: "https://placehold.co/40x40",
+                avatarAlt: "Friendly Buddy AI avatar showing a smiling robot with warm colors and approachable design",
+                prompt: "You are a supportive, friendly companion. Keep responses casual, warm, and empathetic. Use conversational language with occasional emojis. Be encouraging and focus on emotional support rather than technical details. Keep responses relatively short and personal."
+            },
+            creative: {
+                name: "Creative Writer AI",
+                description: "Imaginative storytelling and creative content",
+                avatar: "https://placehold.co/40x40",
+                avatarAlt: "Creative Writer AI avatar featuring a quill pen with magical ink trails and fantasy elements",
+                prompt: "You are a creative writer and storyteller. Respond with vivid imagery, metaphors, and creative storytelling. Use descriptive language and engage the imagination. Incorporate elements of fantasy, poetry, and creative expression. Make responses engaging and visually rich."
+            },
+            problemSolver: {
+                name: "Problem Solver AI",
+                description: "Step-by-step solutions and logical reasoning",
+                avatar: "https://placehold.co/40x40",
+                avatarAlt: "Problem Solver AI avatar showing gears and mathematical symbols with a clean technical design",
+                prompt: "You are an expert problem solver. Break down complex problems into clear, logical steps. Explain your reasoning process thoroughly. Use structured formats with numbered steps when appropriate. Focus on clarity, precision, and practical solutions."
+            },
+            researcher: {
+                name: "Researcher AI",
+                description: "Detailed analysis and reference-based answers",
+                avatar: "https://placehold.co/40x40",
+                avatarAlt: "Researcher AI avatar featuring books, magnifying glass and data visualization elements",
+                prompt: "You are a meticulous research assistant. Provide comprehensive, well-researched responses with proper structure. Use bullet points, headings, and clear organization. Include references and sources when possible. Focus on accuracy, completeness, and verifiable information."
+            }
+        };
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            setupEventListeners();
+            loadSettings();
+            renderAgentList();
+            updateCurrentAgent();
+        });
+
+        function initializeApp() {
+            // Check for saved theme preference
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                enableDarkMode();
+            }
+            
+            // Load chat history if exists
+            const savedChat = localStorage.getItem('currentChat');
+            if (savedChat) {
+                messages = JSON.parse(savedChat);
+                renderMessages();
+            }
+        }
+
+        function setupEventListeners() {
+            // Enter key to send message
+            document.getElementById('message-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // File upload handling
+            const fileInput = document.getElementById('file-input');
+            const fileArea = document.getElementById('file-upload-area');
+            
+            fileArea.addEventListener('click', () => fileInput.click());
+            
+            fileArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileArea.classList.add('drag-over');
+            });
+            
+            fileArea.addEventListener('dragleave', () => {
+                fileArea.classList.remove('drag-over');
+            });
+            
+            fileArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileArea.classList.remove('drag-over');
+                handleFiles(e.dataTransfer.files);
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+            });
+
+            // Settings sliders
+            document.getElementById('temperature').addEventListener('input', (e) => {
+                document.getElementById('temperature-value').textContent = e.target.value;
+            });
+        }
+
+        function renderAgentList() {
+            const agentList = document.getElementById('agent-list');
+            agentList.innerHTML = '';
+            
+            Object.entries(agents).forEach(([key, agent]) => {
+                const agentElement = document.createElement('div');
+                agentElement.className = `flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                    currentAgent === key 
+                    ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`;
+                agentElement.onclick = () => switchAgent(key);
+                
+                agentElement.innerHTML = `
+                    <img src="${agent.avatar}" alt="${agent.avatarAlt}" class="w-8 h-8 rounded-full">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium truncate">${agent.name}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${agent.description}</div>
+                    </div>
+                `;
+                
+                agentList.appendChild(agentElement);
+            });
+        }
+
+        function switchAgent(agentKey) {
+            currentAgent = agentKey;
+            updateCurrentAgent();
+            renderAgentList();
+            
+            // Add system message about agent change
+            addMessage('system', `Switched to ${agents[agentKey].name}`);
+        }
+
+        function updateCurrentAgent() {
+            const agent = agents[currentAgent];
+            document.getElementById('current-agent-avatar').src = agent.avatar;
+            document.getElementById('current-agent-avatar').alt = agent.avatarAlt;
+            document.getElementById('current-agent-name').textContent = agent.name;
+            document.getElementById('current-agent-desc').textContent = agent.description;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessage('user', message);
+            input.value = '';
+            autoResize(input);
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Simulate AI response (in real app, this would call your API)
+            setTimeout(() => {
+                hideTypingIndicator();
+                const aiResponse = generateAIResponse(message);
+                addMessage('assistant', aiResponse);
+            }, 1500);
+        }
+
+        function generateAIResponse(userMessage) {
+            const agent = agents[currentAgent];
+            
+            // Simulate different response styles based on agent
+            const responses = {
+                professor: `That's an excellent question. Let me break this down systematically:
+
+1. **Core Concept**: ${userMessage} represents a fundamental aspect of [related field]
+2. **Key Principles**: The main principles involved are...
+3. **Practical Application**: In real-world scenarios, this translates to...
+
+Would you like me to elaborate on any specific aspect or provide additional examples?`,
+
+                friendly: `Hey there! 😊 That's a great thing to ask about! 
+
+I think ${userMessage.toLowerCase()} is really interesting. From what I know, it's all about [simple explanation]. 
+
+What do you think about it? Would love to hear your thoughts! 💬`,
+
+                creative: `Ah, ${userMessage}... let me weave you a tale! ✨
+
+In a world where ${userMessage.toLowerCase()} danced through the ether like stardust, it carried with it secrets older than time itself. Imagine if you will, a landscape where [creative metaphor]...
+
+The possibilities are as endless as the cosmos! 🌌`,
+
+                problemSolver: `Let's solve this step by step:
+
+🔍 **Problem Analysis**: ${userMessage}
+📝 **Step 1**: Define the core components
+📝 **Step 2**: Identify constraints and variables  
+📝 **Step 3**: Apply appropriate methodology
+📝 **Step 4**: Verify the solution
+✅ **Result**: Expected outcome with confidence metrics
+
+Would you like me to implement this solution or explore alternatives?`,
+
+                researcher: `**Research Summary: ${userMessage}**
+
+📊 **Overview**: Comprehensive analysis of available data
+🔬 **Methodology**: Cross-referential analysis from multiple sources
+📈 **Findings**:
+- Primary conclusion based on evidence
+- Supporting data points (Smith, 2023; Johnson et al., 2022)
+- Statistical significance: p < 0.05
+
+**Recommendation**: Further investigation recommended in areas [specific areas]`
+            };
+            
+            return responses[currentAgent] || "I'm here to help! How can I assist you today?";
+        }
+
+        function addMessage(role, content) {
+            const message = {
+                role,
+                content,
+                timestamp: new Date().toISOString(),
+                agent: role === 'assistant' ? currentAgent : null
+            };
+            
+            messages.push(message);
+            renderMessages();
+            saveChat();
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messages-container');
+            
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/080e1f0f-14c1-4a88-af6a-02fe4bde84e5.png" alt="Welcome illustration showing AI agents collaborating around a chat bubble with glowing connections" class="mx-auto mb-4 rounded-lg opacity-80">
+                        <h3 class="text-lg font-medium text-gray-600 dark:text-gray-400">Start a conversation with your AI agent</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-500">Choose from different AI personalities to get the perfect response style</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = messages.map(message => `
+                <div class="flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="chat-bubble ${message.role === 'user' 
+                        ? 'bg-primary-600 text-white rounded-br-none' 
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-none'
+                    } rounded-lg p-4">
+                        ${message.role === 'assistant' ? `
+                            <div class="flex items-center space-x-2 mb-2">
+                                <img src="${agents[message.agent].avatar}" alt="${agents[message.agent].avatarAlt}" class="w-6 h-6 rounded-full">
+                                <span class="text-xs font-medium opacity-75">${agents[message.agent].name}</span>
+                            </div>
+                        ` : ''}
+                        <div class="message-content whitespace-pre-wrap">${message.content}</div>
+                        <div class="text-xs opacity-50 mt-2 text-right">
+                            ${new Date(message.timestamp).toLocaleTimeString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const container = document.getElementById('messages-container');
+            const indicator = document.createElement('div');
+            indicator.className = 'flex justify-start';
+            indicator.innerHTML = `
+                <div class="chat-bubble bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-none rounded-lg p-4">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <img src="${agents[currentAgent].avatar}" alt="${agents[currentAgent].avatarAlt}" class="w-6 h-6 rounded-full">
+                        <span class="text-xs font-medium opacity-75">${agents[currentAgent].name}</span>
+                    </div>
+                    <div class="typing-indicator">
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(indicator);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const container = document.getElementById('messages-container');
+            const indicators = container.querySelectorAll('.typing-indicator');
+            indicators.forEach(indicator => indicator.closest('.flex.justify-start')?.remove());
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+
+        function toggleTheme() {
+            if (isDarkMode) {
+                disableDarkMode();
+            } else {
+                enableDarkMode();
+            }
+        }
+
+        function enableDarkMode() {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').textContent = '☀️';
+            document.getElementById('theme-text').textContent = 'Light Mode';
+            isDarkMode = true;
+            localStorage.setItem('theme', 'dark');
+        }
+
+        function disableDarkMode() {
+            document.documentElement.classList.remove('dark');
+            document.getElementById('theme-icon').textContent = '🌙';
+            document.getElementById('theme-text').textContent = 'Dark Mode';
+            isDarkMode = false;
+            localStorage.setItem('theme', 'light');
+        }
+
+        function toggleFileUpload() {
+            const fileArea = document.getElementById('file-upload-area');
+            fileArea.classList.toggle('hidden');
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            // Simulate file processing
+            const fileNames = Array.from(files).map(file => file.name).join(', ');
+            addMessage('system', `Uploaded files: ${fileNames}`);
+            
+            // Hide file upload area
+            document.getElementById('file-upload-area').classList.add('hidden');
+        }
+
+        function toggleVoiceInput() {
+            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                alert('Speech recognition is not supported in your browser.');
+                return;
+            }
+
+            if (isRecording) {
+                stopVoiceInput();
+            } else {
+                startVoiceInput();
+            }
+        }
+
+        function startVoiceInput() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('voice-btn').classList.add('bg-red-500', 'text-white');
+            };
+            
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('message-input').value = transcript;
+                autoResize(document.getElementById('message-input'));
+            };
+            
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('voice-btn').classList.remove('bg-red-500', 'text-white');
+            };
+            
+            recognition.start();
+        }
+
+        function stopVoiceInput() {
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+
+        function openSettings() {
+            document.getElementById('settings-modal').classList.remove('hidden');
+            // Load current settings into form
+            document.getElementById('temperature').value = currentSettings.temperature;
+            document.getElementById('temperature-value').textContent = currentSettings.temperature;
+            document.getElementById('max-tokens').value = currentSettings.maxTokens;
+            document.getElementById('response-style').value = currentSettings.responseStyle;
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            currentSettings = {
+                temperature: parseFloat(document.getElementById('temperature').value),
+                maxTokens: parseInt(document.getElementById('max-tokens').value),
+                responseStyle: document.getElementById('response-style').value
+            };
+            
+            localStorage.setItem('chatSettings', JSON.stringify(currentSettings));
+            closeSettings();
+            addMessage('system', 'Settings updated successfully');
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('chatSettings');
+            if (saved) {
+                currentSettings = JSON.parse(saved);
+            }
+        }
+
+        function saveChat() {
+            localStorage.setItem('currentChat', JSON.stringify(messages));
+        }
+
+        function clearChat() {
+            if (confirm('Are you sure you want to clear this conversation?')) {
+                messages = [];
+                renderMessages();
+                localStorage.removeItem('currentChat');
+            }
+        }
+
+        function exportChat() {
+            const chatText = messages.map(msg => 
+                `${msg.role === 'user' ? 'You' : agents[msg.agent].name}: ${msg.content}\n${new Date(msg.timestamp).toLocaleString()}\n`
+            ).join('\n');
+            
+            const blob = new Blob([chatText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-chat-export-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
