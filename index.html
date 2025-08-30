@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Multi-Agent AI Chat Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; background: #f0f0f0; }
+  .container { max-width: 600px; margin: 2rem auto; background: white; border-radius: 8px; padding: 1rem; box-shadow: 0 0 10px #ccc; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  select, button { padding: 0.5rem; font-size: 1rem; }
+  .chat { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 1rem; border-radius: 6px; background: #fafafa; }
+  .message { margin-bottom: 1rem; max-width: 80%; }
+  .user { text-align: right; }
+  .user .bubble { background: #007bff; color: white; display: inline-block; padding: 0.5rem 1rem; border-radius: 15px 15px 0 15px; }
+  .agent .bubble { background: #e0e0e0; color: black; display: inline-block; padding: 0.5rem 1rem; border-radius: 15px 15px 15px 0; }
+  .input-area { margin-top: 1rem; display: flex; }
+  input[type=text] { flex: 1; padding: 0.5rem; font-size: 1rem; border-radius: 6px; border: 1px solid #ccc; }
+  button.send { margin-left: 0.5rem; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  button.send:disabled { background: #aaa; cursor: not-allowed; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <label for="agent-select">Choose AI Agent:</label>
+      <select id="agent-select">
+        <option value="professor">Professor AI</option>
+        <option value="friendly">Friendly Buddy AI</option>
+        <option value="creative">Creative Writer AI</option>
+        <option value="problemSolver">Problem Solver AI</option>
+        <option value="researcher">Researcher AI</option>
+      </select>
+    </div>
+    <div class="chat" id="chat"></div>
+    <div class="input-area">
+      <input type="text" id="user-input" placeholder="Type your message..." />
+      <button class="send" id="send-btn" disabled>Send</button>
+    </div>
+  </div>
+
+<script>
+  const chatEl = document.getElementById('chat');
+  const inputEl = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  const agentSelect = document.getElementById('agent-select');
+
+  const agents = {
+    professor: (msg) => `Professor AI says: Let's analyze "${msg}" carefully with detailed explanations.`,
+    friendly: (msg) => `Friendly Buddy AI says: Hey! I think "${msg}" sounds great! 😊`,
+    creative: (msg) => `Creative Writer AI says: Imagine a world where "${msg}" sparks endless adventures...`,
+    problemSolver: (msg) => `Problem Solver AI says: Step 1: Understand "${msg}". Step 2: Break it down...`,
+    researcher: (msg) => `Researcher AI says: According to recent studies, "${msg}" is significant because...`
+  };
+
+  function appendMessage(text, sender) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message ' + sender;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    msgDiv.appendChild(bubble);
+    chatEl.appendChild(msgDiv);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  inputEl.addEventListener('input', () => {
+    sendBtn.disabled = inputEl.value.trim() === '';
+  });
+
+  sendBtn.addEventListener('click', () => {
+    const userText = inputEl.value.trim();
+    if (!userText) return;
+    appendMessage(userText, 'user');
+    inputEl.value = '';
+    sendBtn.disabled = true;
+
+    // Simulate AI typing delay
+    setTimeout(() => {
+      const agent = agentSelect.value;
+      const response = agents[agent](userText);
+      appendMessage(response, 'agent');
+    }, 1000);
+  });
+
+  // Optional: send message on Enter key
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !sendBtn.disabled) {
+      sendBtn.click();
+    }
+  });
+</script>
+</body>
+</html>
